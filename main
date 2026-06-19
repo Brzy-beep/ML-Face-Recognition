@@ -1,0 +1,61 @@
+import cv2
+import os
+import glob
+from deepface import DeepFace
+
+#set up paths
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+emoji_folder = os.path.join(BASE_DIR, "emojis")
+
+cap = cv2.VideoCapture(0)
+
+print(f"App Running! Press 'q' to quit.")
+
+while True:
+    ret, frame = cap.read()
+    if not ret: break
+    frame = cv2.resize(frame, (640, 480))
+    h, w, _ = frame.shape
+    
+    try:
+        #emotion analysis
+        results = DeepFace.analyze(frame, actions=['emotion'], enforce_detection=False)
+        emo = results[0]['dominant_emotion']
+        conf_score = results[0]['emotion'][emo]
+        
+        #image search
+        search_pattern = os.path.join(emoji_folder, f"{emo.lower()}.*")
+        found_files = glob.glob(search_pattern)
+        
+        if found_files:
+            emoji_img = cv2.imread(found_files[0])
+            emoji_img = cv2.resize(emoji_img, (h, h)) 
+            
+            #text
+            font = cv2.FONT_HERSHEY_DUPLEX
+            
+            #emotion name
+            text_name = emo.upper()
+            cv2.putText(emoji_img, text_name, (int(h*0.1), h - 60), font, 1.2, (255, 255, 255), 3)
+            cv2.putText(emoji_img, text_name, (int(h*0.1), h - 60), font, 1.2, (0, 0, 0), 1)
+            
+            # confidence score
+            text_perc = f"{conf_score:.1f}% Accurate"
+            cv2.putText(emoji_img, text_perc, (int(h*0.1), h - 20), font, 0.8, (0, 255, 0), 2)
+            cv2.putText(emoji_img, text_perc, (int(h*0.1), h - 20), font, 0.8, (255, 0, 0), 1)
+            
+            #side-by-side
+            combined = cv2.hconcat([frame, emoji_img])
+            cv2.imshow('AI Emotion Split-Screen', combined)
+        else:
+            cv2.putText(frame, f"Searching for: {emo}.*", (10, 50), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            cv2.imshow('AI Emotion Split-Screen', frame)
+
+    except Exception as e:
+        cv2.imshow('AI Emotion Split-Screen', frame)
+
+    if cv2.waitKey(1) & 0xFF == ord('q'): break
+
+cap.release()
+cv2.destroyAllWindows()
